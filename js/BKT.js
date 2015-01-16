@@ -4,196 +4,164 @@ var BKT = {
 
   codapPhone: null,
 
-  initGame: function() {
+  kDataDescription: {
+    name: "BKT",
+    version: "0.1",
+    dimensions: {width: 300, height: 150},
+    collections: [
+      {
+        name: "Students",
+        attrs: [
+          {name: "student", type: 'nominal', description: "The student name"},
+          {name: "Initial Knowledge", type: 'numeric', description: "", precision: 2},
+          {name: "Transition Parameter", type: 'numeric', description: "", precision: 2},
+          {name: "Slip Parameter", type: 'numeric', description: "", precision: 2},
+          {name: "Guess Parameter", type: 'numeric', description: "", precision: 2},
+          {name: "M Parameter", type: 'numeric', description: "", precision: 2}
+        ],
+        childAttrName: "Tracing",
+        labels: {
+          singleCase: "student",
+          pluralCase: "students",
+          singleCaseWithArticle: "a student",
+          setOfCases: "class",
+          setOfCasesWithArticle: "a class"
+        }
+      },
+      {
+        name: "Traces",
+        attrs: [
+          {name: "time (sec)", type: 'numeric', description: "", precision: 2},
+          {name: "knowledge", type: 'numeric', description: "", precision: 2, min: 0, max: 1 }
+        ],
+        labels: {
+          singleCase: "trace",
+          pluralCase: "traces",
+          singleCaseWithArticle: "a trace",
+          setOfCases: "analysis",
+          setOfCasesWithArticle: "an analysis"
+        },
+        defaults: {
+          xAttr: "time",
+          yAttr: "knowledge"
+        }
+      }
+    ]
+  },
 
-    // Invoke the JavaScript interface
+  startPhone: function () {
+    this.codapPhone = new iframePhone.IframePhoneRpcEndpoint(function () {
+    }, "codap-game", window.parent);
+  },
 
-    this.codapPhone = new iframePhone.IframePhoneRpcEndpoint(function() {}, "codap-game", window.parent);
-
+  initGame: function (iDataDescription) {
     this.codapPhone.call({
       action: 'initGame',
-      args: {
-        name: "BKT",
-        version: "0.1",
-        dimensions: { width: 200, height: 150 },
-        collections: [
-          {
-            name: "Students",
-            attrs: [
-              { name: "student", type: 'nominal', description: "The student name" },
-              { name: "Initial Knowledge", type: 'numeric', description: "", precision: 2 },
-              { name: "Transition Parameter", type: 'numeric', description: "", precision: 2 },
-              { name: "Slip Parameter", type: 'numeric', description: "", precision: 2 },
-              { name: "Guess Parameter", type: 'numeric', description: "", precision: 2 }
-            ],
-            childAttrName: "Tracing",
-            labels: {
-              singleCase: "student",
-              pluralCase: "students",
-              singleCaseWithArticle: "a student",
-              setOfCases: "class",
-              setOfCasesWithArticle: "a class"
-            }
-          },
-          {
-            name: "Traces",
-            attrs: [
-              { name: "time (sec)", type: 'numeric', description: "", precision: 2 },
-              { name: "knowledge", type: 'numeric', description: "", precision: 2 }
-            ],
-            labels: {
-              singleCase: "trace",
-              pluralCase: "traces",
-              singleCaseWithArticle: "a trace",
-              setOfCases: "analysis",
-              setOfCasesWithArticle: "an analysis"
-            },
-            defaults: {
-              xAttr: "time (sec)",
-              yAttr: "knowledge"
+      args: iDataDescription
+    }, function () {
+      this.codapPhone.call( {
+            action: 'createComponent',
+            args: {
+              type: 'DG.TableView',  // or 'DG.GraphView', 'DG.SliderView', 'DG.TextView', 'DG.CalculatorView'
+              log: false
             }
           }
-        ]
-      }
-    }, function() {
-//      this.setupNewGame();
+      );
+      this.codapPhone.call( {
+            action: 'createComponent',
+            args: {
+              type: 'DG.GraphView',  // or 'DG.GraphView', 'DG.SliderView', 'DG.TextView', 'DG.CalculatorView'
+              log: false
+            }
+          }
+      );
     }.bind(this));
   },
 
-  addCase: function(callback) {
+// Format of the data for the BKT situation
+//{
+//  "name": "Students",
+//    "attrs": [
+//  "student",
+//  "Initial Knowledge",
+//  "Transition Parameter",
+//  "Slip Parameter",
+//  "Guess Parameter",
+//  "M Parameter",
+//  "Trace"
+//],
+//    "cases": [
+//  {
+//    "student": "name",
+//    "Initial Knowledge": 0,
+//    "Transition Parameter": 0,
+//    "Slip Parameter": 0,
+//    "M Parameter": 0,
+//    "Trace": {
+//      "name": "trace",
+//      "attrs": [
+//        "time",
+//        "knowledge"
+//      ],
+//      "cases": [
+//        {
+//          "time": 0,
+//          "knowledge": 0
+//        },
+//        {
+//          "time": 0,
+//          "knowledge": 0
+//        }
+//      ]
+//    }
+//  }
+//]
+//}
 
-    var createCase = function() {
-      this.codapPhone.call({
-        action: 'createCase',
-        args: {
-          collection: "Trials",
-          parent: this.openRoundID,
-          values: [ this.trialNum, this.guess, this.result ]
-        }
-      });
-      callback();
+  requestData: function () {
+
+    var addTrace = function (iParentID, iTrace) {
+      iTrace.cases.forEach(function (iTick) {
+        this.codapPhone.call({
+          action: 'createCase',
+          args: {
+            collection: "trace",
+            parent: iParentID,
+            values: [iTick.time, iTick.knowledge]
+          }
+        });
+      }.bind(this));
     }.bind(this);
 
-    if( ! this.openRoundID ) {
-      // Start a new Games case if we don't have one open
+    var addStudent = function (iStudent) {
       this.codapPhone.call({
-          action: 'openCase',
-          args: {
-            collection: "Games",
-            values: [ this.gameNum, this.trialNum ]
-          }
-        }, function(result) {
-          if( result.success) {
-            this.openRoundID = result.caseID;
-            createCase();
-          } else {
-            console.log("BKT: Error calling 'openCase'"); // alert the user? Bail?
-          }
-        }.bind(this));
-    } else {
-      this.codapPhone.call({
-        action: 'updateCase',
+        action: 'openCase',
         args: {
-          collection: "Games",
-          caseID: this.openRoundID,
-          values: [ this.gameNum, this.trialNum ]
+          collection: "Students",
+          values: [iStudent["student"], iStudent["Initial Knowledge"], iStudent["Transition Parameter"],
+            iStudent["Slip Parameter"], iStudent["Guess Parameter"], iStudent["M Parameter"]]
         }
-      }, createCase);
-    }
-  },
+      }, function (result) {
+        if (result.success) {
+          addTrace(result.caseID, iStudent["Trace"]);
+        } else {
+          console.log("BKT: Error calling 'openCase'"); // alert the user? Bail?
+        }
+      }.bind(this));
+    }.bind(this);
 
-  addGame: function() {
-    if (this.openRoundID) {
-      this.codapPhone.call({
-        action: 'closeCase',
-        args: {
-          collection: "Games",
-          caseID: this.openRoundID,
-          values: [ this.gameNum, this.trialNum ]
-        }
+    var processData = function (iData) {
+      iData.cases.forEach(function (iStudent) {
+        addStudent(iStudent);
       });
-      // Since we are assuming closeCase will succeed, immediately forget the previously open round.
-      this.openRoundID = null;
-    }
-  },
-
-  //setupNewGame: function() {
-  //  this.gameNum++;
-  //
-  //  this.chooseNumber();
-  //  this.trialNum = 0;
-  //  this.currRangeMin = 0;
-  //  this.currRangeMax = this.absRangeMax;
-  //},
-
-  changeStudent: function() {
-
-    function processData( iResponse, textStatus, jqXHR) {
-      console.log('got response');
-    }
+    }.bind(this);
 
     // Send request to BKT server
     var kURL = 'https://griffin.ucsc.edu/bkt?student="anon"';
-    jQuery.post( kURL, 'Student', processData )
+    jQuery.getJSON(kURL, processData);
   }
 
-  //processGuess: function(iGuess, callback) {
-  //
-  //  this.trialNum++;
-  //  this.guess = iGuess;
-  //
-  //  if (Number(iGuess) === this.secret) {
-  //    this.result = "Got it!";
-  //  }
-  //  else if (iGuess < this.secret) {
-  //    this.result = "Too low";
-  //    this.currRangeMin = Math.max( this.currRangeMin, iGuess + 1);
-  //  }
-  //  else if (iGuess > this.secret) {
-  //    this.result = "Too high";
-  //    this.currRangeMax = Math.min( this.currRangeMax, iGuess - 1);
-  //  }
-  //  else {
-  //    this.result = "Guess again";
-  //  }
-  //
-  //  this.addCase(callback);
-  //},
-
-  //userGuess: function(){
-  //  var guess = Number(document.forms.form1.num.value);
-  //  document.forms.form1.enter.disabled = true;
-  //
-  //  this.processGuess(guess, function() {
-  //    alert(this.result);
-  //    document.forms.form1.enter.disabled = false;
-  //
-  //    if (guess === this.secret) {
-  //      this.addGame();
-  //      this.setupNewGame();
-  //    }
-  //  }.bind(this));
-  //}
-
-  //autoGuess: function() {
-  //
-  //  var makeNextGuess = function() {
-  //    var currRange = this.currRangeMax - this.currRangeMin;
-  //    var guess = this.currRangeMin + Math.floor(Math.random() * currRange);
-  //
-  //    this.processGuess(guess, function() {
-  //      if (this.guess === this.secret) {
-  //        this.addGame();
-  //        this.setupNewGame();
-  //      } else {
-  //        makeNextGuess();
-  //      }
-  //    }.bind(this));
-  //
-  //  }.bind(this);
-  //
-  //  makeNextGuess();
-  //}
 };
 
-BKT.initGame();
+BKT.startPhone();
+BKT.initGame(BKT.kDataDescription);
